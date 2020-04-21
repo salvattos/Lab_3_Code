@@ -14,6 +14,12 @@ int bufferIndexLeft = 0;
 float Kd = 0;
 
 
+float distKp = 12;
+float distKi = 1.2;
+int errorIndex = 0;
+static int distSum = 0;
+int errorCount[100] = {0};
+
 /*
  * target wheel speeds; these are in encoder ticks per PID loop!
  * 
@@ -23,11 +29,17 @@ float Kd = 0;
  * and sometimes a fraction negative, but they'll all wash out in the end.
  */
 
-float targetLeft = 50;
-float targetRight = 50;
-int targetDist = 30; // distance fomr wall in cm
-int currentDist = 0; //current distance form wall
+static int leftTarget = 0;
+static int rightTarget = 0;
+const int baseRight = 30;
+const int baseLeft = 30;
 
+int targetLeft = 50;
+int targetRight = 50;
+
+int targetDist = 30; // distance fomr wall in cm
+static float currentDist = 0; //current distance form wall
+static int offset = 0;
 
 
 #endif

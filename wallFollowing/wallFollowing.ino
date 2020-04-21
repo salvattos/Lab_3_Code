@@ -14,7 +14,7 @@ eventTimer timer;   //assumes you named your class EventTimer
 
 //use the Pololu libraries for motors and encoders
 Zumo32U4Motors motors;
-Zumo32U4Encoders encoders; //(we're not acutally using this in this code, but we will soon)
+Zumo32U4Encoders encoders;
 Zumo32U4LineSensors lineSensors;
 Zumo32U4ProximitySensors proxSensors;
 
@@ -104,28 +104,34 @@ void loop()
       motors.setSpeeds(0, 0);
 
       if (buttonA.CheckButtonPress()) {
+        Serial.println("here");
+        myTimer.start(1000);
+        while (!(myTimer.checkExpired())) {}
         state = DRIVING;
-        delay(500); //delay so i can move my finger off of the zumo
       }
+
+
       break;
 
     case DRIVING:
       lineSensors.read(lineSensorValues, QTR_EMITTERS_ON);
       currentDist = distanceFromWall();
-      if (lineSensorValues[0] < 1200 && lineSensorValues[4] < 1200) {
-        if (currentDist < targetDist) {
-          PID(10, 30);
-        }
-        if (currentDist > targetDist){
-        PID(30, 15);
-        } else PID(30, 15);
-        } else state = SHOWING_OFF;
-      break;
+      offset = calcTargets(currentDist);
+
+      leftTarget = baseLeft + offset;
+      rightTarget = baseRight - offset;
+
+       if (lineSensorValues[0] < 1200 && lineSensorValues[4] < 1200) {
+      PID();
+     } else state = SHOWING_OFF;
+    break;
 
     case SHOWING_OFF:
       myTimer.start(1000);
       while (!(myTimer.checkExpired())) {
-        PID(50, -50);
+        rightTarget = 30;
+        leftTarget = -30;
+        PID();
       }
       state = IDLE;
       break;
@@ -164,14 +170,6 @@ float distanceFromWall() {
     //EDIT THIS LINE AFTER YOU CALIBRATE THE SENSOR
     float distancePulse = (pulseLengthUS + 5.5107) / 58.215;  //distance in cm
 
-    // Serial.print(millis());
-    // Serial.print('\t');
-    //Serial.print(pulseLengthTimerCounts);
-    //Serial.print('\t');
-    Serial.print(pulseLengthUS);
-    Serial.print('\t');
-    Serial.print(distancePulse);
-    Serial.print('\n');
     return distancePulse;
 
   }
@@ -213,9 +211,29 @@ ISR(TIMER3_CAPT_vect)
   }
 }
 
-void PID(int leftTarget, int rightTarget) {
+int calcTargets(float currDist) {
   if (readyToPID) //timer flag set
   {
+    //clear the timer flag
+    readyToPID = 0;
+    float distError = targetDist - currDist;
+
+    distSum -= errorCount[errorIndex];
+    distSum += distError;
+    errorCount[errorIndex] = distError;
+    if (errorIndex == 99) errorIndex = 0;
+    else errorIndex++;
+    
+    return distKp * distError + distKi * distSum;
+
+  }
+}
+
+void PID() {
+  Serial.println("got to PID");
+  if (readyToPID) //timer flag set
+  {
+    Serial.println("got IN");
     //clear the timer flag
     readyToPID = 0;
 
@@ -287,9 +305,9 @@ void PID(int leftTarget, int rightTarget) {
 
     Serial.print(0);
     Serial.print('\t');
-    Serial.print(speedLeft);
+    Serial.print(effortLeft);
     Serial.print('\t');
-    Serial.print(leftTarget);
+    Serial.print(effortRight);
     Serial.print('\n');
 
   }
@@ -319,17 +337,4 @@ ISR(TIMER4_OVF_vect)
   countsRight = encoders.getCountsRight();
 
   readyToPID = 1;
-}
-
-void printReadingsToSerial()
-{
-  char buffer[80];
-  sprintf(buffer, "%4d %4d %4d %4d %4d %c\n",
-          lineSensorValues[0],
-          lineSensorValues[1],
-          lineSensorValues[2],
-          lineSensorValues[3],
-          lineSensorValues[4]
-         );
-  Serial.print(buffer);
 }
